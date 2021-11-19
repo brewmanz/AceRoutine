@@ -33,14 +33,18 @@ namespace ace_routine {
 // CoroutineScheduler::list() but I think it's worth it to make debugging
 // easier.
 
+#if 0
 static const char kStatusSuspendedString[] PROGMEM = "Suspended";
 static const char kStatusYieldingString[] PROGMEM = "Yielding";
 static const char kStatusDelayingString[] PROGMEM = "Delaying";
 static const char kStatusRunningString[] PROGMEM = "Running";
 static const char kStatusEndingString[] PROGMEM = "Ending";
 static const char kStatusTerminatedString[] PROGMEM = "Terminated";
-
+#if 0
 const __FlashStringHelper* const sStatusStrings[] = {
+#else
+const __FlashStringHelper* const sStatusStrings[] PROGMEM = {
+#endif
   FPSTR(kStatusSuspendedString),
   FPSTR(kStatusYieldingString),
   FPSTR(kStatusDelayingString),
@@ -48,5 +52,5 @@ const __FlashStringHelper* const sStatusStrings[] = {
   FPSTR(kStatusEndingString),
   FPSTR(kStatusTerminatedString),
 };
-
+#endif
 }

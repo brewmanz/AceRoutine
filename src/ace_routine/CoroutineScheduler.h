@@ -196,6 +196,10 @@ class CoroutineSchedulerTemplate {
           p = (*p)->getNext()) {
         printer.print(F("Coroutine "));
         printer.print((uintptr_t) *p);
+        printer.print(':');
+        (*p)->printName(&printer);
+        printer.print('@');
+        printer.print((*p)->getLineNumber());
         printer.print(F("; status: "));
         (*p)->statusPrintTo(printer);
         printer.println();

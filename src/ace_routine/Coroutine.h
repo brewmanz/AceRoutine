@@ -85,9 +85,13 @@ class SuspendTest_suspendAndResume;
 #define COROUTINE1(name) \
 struct Coroutine_##name : ace_routine::Coroutine { \
   Coroutine_##name(); \
+  void printName(Print* pPrinter) override; \
   int runCoroutine() override; \
 } name; \
 Coroutine_##name :: Coroutine_##name() { \
+} \
+void Coroutine_##name::printName(Print* pPrinter) { \
+  pPrinter->print(F("Coroutine_" #name)); \
 } \
 int Coroutine_##name :: runCoroutine()
 
@@ -95,9 +99,13 @@ int Coroutine_##name :: runCoroutine()
 #define COROUTINE2(className, name) \
 struct className##_##name : className { \
   className##_##name(); \
+  void printName(Print* pPrinter) override; \
   int runCoroutine() override; \
 } name; \
 className##_##name :: className##_##name() { \
+} \
+void className##_##name::printName(Print* pPrinter) { \
+  pPrinter->print(F(#className "_" #name)); \
 } \
 int className##_##name :: runCoroutine()
 
@@ -122,16 +130,24 @@ int className##_##name :: runCoroutine()
 #define EXTERN_COROUTINE1(name) \
 struct Coroutine_##name : ace_routine::Coroutine { \
   Coroutine_##name(); \
+  void printName(Print* pPrinter) override; \
   int runCoroutine() override; \
 }; \
+void Coroutine_##name::printName(Print* pPrinter) { \
+  pPrinter->print(F("Coroutine_" #name)); \
+} \
 extern Coroutine_##name name
 
 /** Implement the 2-argument EXTERN_COROUTINE() macro. */
 #define EXTERN_COROUTINE2(className, name) \
 struct className##_##name : className { \
   className##_##name(); \
+  void printName(Print* pPrinter) override; \
   int runCoroutine() override; \
 }; \
+void Coroutine_##name :: printName(Print* pPrinter) { \
+  pPrinter->print(F(#className "_" #name)); \
+} \
 extern className##_##name name
 
 /** Mark the beginning of a coroutine. */
@@ -153,17 +169,21 @@ extern className##_##name name
  * Implement the common logic for COROUTINE_YIELD(), COROUTINE_AWAIT(),
  * COROUTINE_DELAY().
  */
-#define COROUTINE_YIELD_INTERNAL() \
+#define COROUTINE_YIELD_INTERNAL() COROUTINE_YIELD_INTERNAL_LINE(__LINE__)
+#define COROUTINE_YIELD_INTERNAL_LINE(line) \
     do { \
       __label__ jumpLabel; \
+      mLineNumber = line; \
       this->setJump(&& jumpLabel); \
       return 0; \
       jumpLabel: ; \
     } while (false)
 
 /** Yield execution to another coroutine. */
-#define COROUTINE_YIELD() \
+#define COROUTINE_YIELD() COROUTINE_YIELD_LINE(__LINE__)
+#define COROUTINE_YIELD_LINE(line) \
     do { \
+      mLineNumber = line; \
       this->setYielding(); \
       COROUTINE_YIELD_INTERNAL(); \
       this->setRunning(); \
@@ -179,8 +199,10 @@ extern className##_##name name
  *
  * but potentially slightly more efficient.
  */
-#define COROUTINE_AWAIT(condition) \
+#define COROUTINE_AWAIT(condition) COROUTINE_AWAIT_LINE(condition, __LINE__)
+#define COROUTINE_AWAIT_LINE(condition, line) \
     do { \
+      mLineNumber = line; \
       this->setYielding(); \
       do { \
         COROUTINE_YIELD_INTERNAL(); \
@@ -203,8 +225,10 @@ extern className##_##name name
  * CoroutineScheduler to be slightly more efficient by avoiding the call to
  * Coroutine::runCoroutine() if the delay has not expired.
  */
-#define COROUTINE_DELAY(delayMillis) \
+#define COROUTINE_DELAY(delayMillis) COROUTINE_DELAY_LINE(delayMillis, __LINE__)
+#define COROUTINE_DELAY_LINE(delayMillis, line) \
     do { \
+      mLineNumber = line; \
       this->setDelayMillis(delayMillis); \
       this->setDelaying(); \
       do { \
@@ -214,8 +238,10 @@ extern className##_##name name
     } while (false)
 
 /** Yield for delayMicros. Similiar to COROUTINE_DELAY(delayMillis). */
-#define COROUTINE_DELAY_MICROS(delayMicros) \
+#define COROUTINE_DELAY_MICROS(delayMicros) COROUTINE_DELAY_MICROS_LINE(delayMicros, __LINE__)
+#define COROUTINE_DELAY_MICROS_LINE(delayMicros, line) \
     do { \
+      mLineNumber = line; \
       this->setDelayMicros(delayMicros); \
       this->setDelaying(); \
       do { \
@@ -239,8 +265,10 @@ extern className##_##name name
  * SAMD21, ESP8266), the division by 1000 is relatively slow and consumes
  * significant amount of flash memory (100-150 bytes on AVR).
  */
-#define COROUTINE_DELAY_SECONDS(delaySeconds) \
+#define COROUTINE_DELAY_SECONDS(delaySeconds) COROUTINE_DELAY_SECONDS_LINE(delaySeconds, __LINE__)
+#define COROUTINE_DELAY_SECONDS_LINE(delaySeconds, line) \
     do { \
+      mLineNumber = line; \
       this->setDelaySeconds(delaySeconds); \
       this->setDelaying(); \
       do { \
@@ -253,9 +281,11 @@ extern className##_##name name
  * Mark the end of a coroutine. Subsequent calls to Coroutine::runCoroutine()
  * will do nothing.
  */
-#define COROUTINE_END() \
+#define COROUTINE_END() COROUTINE_END_LINE(__LINE__)
+#define COROUTINE_END_LINE(line) \
     do { \
       __label__ jumpLabel; \
+      mLineNumber = line; \
       this->setEnding(); \
       this->setJump(&& jumpLabel); \
       jumpLabel: ; \
@@ -282,6 +312,10 @@ class CoroutineTemplate {
 
   public:
     /**
+     * Print the name of the Coroutine.
+     */
+    virtual void printName(Print* pPrinter) { pPrinter->print('?'); }
+    /**
      * The body of the coroutine. The COROUTINE macro creates a subclass of
      * this class and puts the body of the coroutine into this method.
      *
@@ -300,7 +334,7 @@ class CoroutineTemplate {
      * called from the global `setup()` function.
      *
      * If your coroutines do not override this method, hence do not need to
-     * perform any setup, then you should *not* call
+*     * perform any setup, then you should *not* call
      * `CoroutineScheduler::setupCoroutines()` to avoid consuming unnecessary
      * flash memory. On AVR processors, each `Coroutine::setupCoroutine()` seems
      * to consume at least 50-60 bytes of flash memory overhead per coroutine.
@@ -464,14 +498,18 @@ class CoroutineTemplate {
      *         Terminated
      * @endverbatim
      */
+#if 0
     typedef uint8_t Status;
-
+#else
+    typedef uint32_t Status;
+#endif
     /**
      * Coroutine has been suspended using suspend() and the scheduler should
      * remove it from the queue upon the next iteration. We don't distinguish
      * whether the coroutine is still in the queue or not with this status. We
      * can add that later if we need to.
      */
+#if 0
     static const Status kStatusSuspended = 0;
 
     /** Coroutine returned using the COROUTINE_YIELD() statement. */
@@ -488,7 +526,41 @@ class CoroutineTemplate {
 
     /** Coroutine has ended and no longer in the scheduler queue. */
     static const Status kStatusTerminated = 5;
+#elif 0
+    static const Status kStatusSuspended = 'S'; // was 0;
 
+    /** Coroutine returned using the COROUTINE_YIELD() statement. */
+    static const Status kStatusYielding = 'Y'; // was 1;
+
+    /** Coroutine returned using the COROUTINE_DELAY() statement. */
+    static const Status kStatusDelaying = 'D'; // was 2;
+
+    /** Coroutine is currenly running. True only within the coroutine itself. */
+    static const Status kStatusRunning = 'R'; // was 3;
+
+    /** Coroutine executed the COROUTINE_END() statement. */
+    static const Status kStatusEnding = 'E'; // was 4;
+
+    /** Coroutine has ended and no longer in the scheduler queue. */
+    static const Status kStatusTerminated = 'T'; // was 5;
+#else
+    static const Status kStatusSuspended = 'S' + 'u'*0x100 + 's'*0x10000; // was 0;
+
+    /** Coroutine returned using the COROUTINE_YIELD() statement. */
+    static const Status kStatusYielding = 'Y' + 'l'*0x100 + 'd'*0x10000; // was 1;
+
+    /** Coroutine returned using the COROUTINE_DELAY() statement. */
+    static const Status kStatusDelaying = 'D' + 'l'*0x100 + 'y'*0x10000; // was 2;
+
+    /** Coroutine is currenly running. True only within the coroutine itself. */
+    static const Status kStatusRunning = 'R' + 'u'*0x100 + 'n'*0x10000; // was 3;
+
+    /** Coroutine executed the COROUTINE_END() statement. */
+    static const Status kStatusEnding = 'E' + 'n'*0x100 + 'd'*0x10000; // was 4;
+
+    /** Coroutine has ended and no longer in the scheduler queue. */
+    static const Status kStatusTerminated = 'T' + 'r'*0x100 + 'm*0x10000'; // was 5;
+#endif
     /** Constructor. Automatically insert self into singly-linked list. */
     CoroutineTemplate() {
       insertAtRoot();
@@ -513,7 +585,15 @@ class CoroutineTemplate {
 
     /** Print the human-readable string of the Status. */
     void statusPrintTo(Print& printer) {
+#if 0
       printer.print(sStatusStrings[mStatus]);
+#elif 0
+      printer.print((__FlashStringHelper*)pgm_read_word(&sStatusStrings[mStatus]));
+#elif 0
+      printer.print((char)mStatus);
+#else
+      printer.print((const char*)&mStatus);
+#endif
     }
 
     /**
@@ -527,6 +607,11 @@ class CoroutineTemplate {
      * runCoroutine().
      */
     void* getJump() const { return mJumpPoint; }
+
+    /**
+     * Return the Line Number of last milestone.
+     */
+    uint16_t getLineNumber() const { return mLineNumber; }
 
     /** Set the kStatusRunning state. */
     void setRunning() { mStatus = kStatusRunning; }
@@ -668,6 +753,9 @@ class CoroutineTemplate {
 
     /** Address of the label used by the computed-goto. */
     void* mJumpPoint = nullptr;
+
+    /** Line Number of last milestone. */
+    uint16_t mLineNumber = 0;
 
     /** Run-state of the coroutine. */
     Status mStatus = kStatusYielding;

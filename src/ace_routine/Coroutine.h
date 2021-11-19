@@ -563,7 +563,7 @@ class CoroutineTemplate {
     static const Status kStatusEnding = 'E' + 'n'*0x100 + 'd'*0x10000; // was 4;
 
     /** Coroutine has ended and no longer in the scheduler queue. */
-    static const Status kStatusTerminated = 'T' + 'r'*0x100 + 'm*0x10000'; // was 5;
+    static const Status kStatusTerminated = 'T' + 'r'*0x100 + 'm'*0x10000; // was 5;
 #endif
     /** Constructor. Automatically insert self into singly-linked list. */
     CoroutineTemplate() {
@@ -618,7 +618,10 @@ class CoroutineTemplate {
     uint16_t getLineNumber() const { return mLineNumber; }
 
     /** Set the kStatusRunning state. */
-    void setRunning() { mStatus = kStatusRunning; }
+    void setRunning() {
+      if(msChangeStatusCB){ msChangeStatusCB(this, kStatusRunning); }
+      mStatus = kStatusRunning;
+    }
 
     /** Set the kStatusDelaying state. */
     void setYielding() { mStatus = kStatusYielding; }
@@ -752,6 +755,12 @@ class CoroutineTemplate {
     }
 
   protected:
+/**
+ * Give option for callback to notice that statis has changed (to Running)
+ */
+typedef void(*fpChangeStatusCB)(const CoroutineTemplate* pCoroutine, Status newStatus);
+static fpChangeStatusCB msChangeStatusCB;
+
     /** Pointer to the next coroutine in a singly-linked list. */
     CoroutineTemplate* mNext = nullptr;
 

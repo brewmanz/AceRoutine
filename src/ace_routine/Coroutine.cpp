@@ -52,5 +52,8 @@ const __FlashStringHelper* const sStatusStrings[] PROGMEM = {
   FPSTR(kStatusEndingString),
   FPSTR(kStatusTerminatedString),
 };
+
 #endif
+template<> CoroutineTemplate<ClockInterface>::fpChangeStatusCB CoroutineTemplate<ClockInterface>::msChangeStatusCB = nullptr;
+
 }

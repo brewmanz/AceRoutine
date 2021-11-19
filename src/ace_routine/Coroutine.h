@@ -316,6 +316,10 @@ class CoroutineTemplate {
      */
     virtual void printName(Print* pPrinter) { pPrinter->print('?'); }
     /**
+     * Print extra information about Coroutine.
+     */
+    virtual void printExtra(Print* pPrinter) { pPrinter->print('-'); }
+    /**
      * The body of the coroutine. The COROUTINE macro creates a subclass of
      * this class and puts the body of the coroutine into this method.
      *

@@ -202,6 +202,8 @@ class CoroutineSchedulerTemplate {
         printer.print((*p)->getLineNumber());
         printer.print(F("; status: "));
         (*p)->statusPrintTo(printer);
+        printer.print(F("; extra: "));
+        (*p)->printExtra(&printer);
         printer.println();
       }
     }

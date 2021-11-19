@@ -584,21 +584,27 @@ class CoroutineTemplate {
      */
     ~CoroutineTemplate() = default;
 
+public:
     /** Return the status of the coroutine. Used by the CoroutineScheduler. */
     Status getStatus() const { return mStatus; }
 
     /** Print the human-readable string of the Status. */
     void statusPrintTo(Print& printer) {
+      statusPrintTo(printer, mStatus);
+    }
+    /** Print the human-readable string of the Status. */
+    static void statusPrintTo(Print& printer, Status status) {
 #if 0
-      printer.print(sStatusStrings[mStatus]);
+      printer.print(sStatusStrings[status]);
 #elif 0
-      printer.print((__FlashStringHelper*)pgm_read_word(&sStatusStrings[mStatus]));
+      printer.print((__FlashStringHelper*)pgm_read_word(&sStatusStrings[status]));
 #elif 0
-      printer.print((char)mStatus);
+      printer.print((char)status);
 #else
-      printer.print((const char*)&mStatus);
+      printer.print((const char*)&status);
 #endif
     }
+  protected:
 
     /**
      * Pointer to label where execute will start on the next call to
@@ -612,14 +618,11 @@ class CoroutineTemplate {
      */
     void* getJump() const { return mJumpPoint; }
 
-    /**
-     * Return the Line Number of last milestone.
-     */
-    uint16_t getLineNumber() const { return mLineNumber; }
-
     /** Set the kStatusRunning state. */
     void setRunning() {
-      if(msChangeStatusCB){ msChangeStatusCB(this, kStatusRunning); }
+      if(msChangeStatusCB != nullptr){
+        msChangeStatusCB(this, kStatusRunning);
+      }
       mStatus = kStatusRunning;
     }
 
@@ -786,6 +789,18 @@ static fpChangeStatusCB msChangeStatusCB;
      * milliseconds, microseconds, or seconds.
      */
     uint16_t mDelayDuration;
+  public:
+    /**
+     * Return the Line Number of last milestone.
+     */
+    uint16_t getLineNumber() const { return mLineNumber; }
+
+    /**
+     * Set status change callback.
+     */
+    static void setStatusChangeCB(fpChangeStatusCB changeStatusCB) {
+      msChangeStatusCB = changeStatusCB;
+    }
 };
 
 /**

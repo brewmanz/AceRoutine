@@ -30,6 +30,48 @@ SOFTWARE.
 #include <AceCommon.h> // FCString
 #include "ClockInterface.h"
 
+#ifndef NUM2STR
+ #define NUM2STR(N) NUM2STR2(N)
+ #define NUM2STR2(N) #N
+#endif
+
+#ifndef ACE_RUN_TICKS // pre-define to 3 for millis, or 6 for micros
+ #if 1 // 0 for millis, 1 for micros
+  #define ACE_RUN_TICKS 6
+ #else
+  #define ACE_RUN_TICKS 3
+ #endif
+ #pragma message("BTW ACE_RUN_TICKS now set to " NUM2STR(ACE_RUN_TICKS) " (3=millis, 6=micros)")
+#else
+ #pragma message("BTW ACE_RUN_TICKS already set " NUM2STR(ACE_RUN_TICKS) " (3=millis, 6=micros)")
+#endif
+
+#if 0 // always 0
+// set bits to 1 to select particular options
+#elif 0
+ // Flash/RAM=13428/865; 4 Coroutines
+ #define ACE_USE_FLASH_STRING_STATUS // original code
+#elif 0
+ // Flash/RAM=13410/865
+ #define ACE_USE_FLASH_STRING_STATUS // original code
+ #define ACE_USE_FLASH_SHORT_STRING_STATUS // but with shorter names
+#elif 0
+ // Flash/RAM=13428/853
+ #define ACE_USE_FLASH_STRING_STATUS // almost original code
+ #define ACE_USE_FLASH_STRING_ARRAY_STATUS // with RAM saving array
+#elif 1
+ // Flash/RAM=13410/853
+ #define ACE_USE_FLASH_STRING_STATUS // almost original code
+ #define ACE_USE_FLASH_STRING_ARRAY_STATUS // with RAM saving array
+ #define ACE_USE_FLASH_SHORT_STRING_STATUS // but with shorter names
+#elif 1
+ // Flash/RAM=13320/853
+ #define ACE_USE_SINGLE_CHAR_STATUS // use 8-bit status as single char
+#elif 1
+ // Flash/RAM=13556/865
+ #define ACE_USE_MULTI_CHAR_STATUS // use 32-bit status as up to 3 chars
+#endif
+
 class AceRoutineTest_statusStrings;
 class SuspendTest_suspendAndResume;
 
@@ -85,12 +127,12 @@ class SuspendTest_suspendAndResume;
 #define COROUTINE1(name) \
 struct Coroutine_##name : ace_routine::Coroutine { \
   Coroutine_##name(); \
-  void printName(Print* pPrinter) override; \
+  void printName(Print* pPrinter) const override; \
   int runCoroutine() override; \
 } name; \
 Coroutine_##name :: Coroutine_##name() { \
 } \
-void Coroutine_##name::printName(Print* pPrinter) { \
+void Coroutine_##name::printName(Print* pPrinter) const { \
   pPrinter->print(F("Coroutine_" #name)); \
 } \
 int Coroutine_##name :: runCoroutine()
@@ -99,12 +141,12 @@ int Coroutine_##name :: runCoroutine()
 #define COROUTINE2(className, name) \
 struct className##_##name : className { \
   className##_##name(); \
-  void printName(Print* pPrinter) override; \
+  void printName(Print* pPrinter) const override; \
   int runCoroutine() override; \
 } name; \
 className##_##name :: className##_##name() { \
 } \
-void className##_##name::printName(Print* pPrinter) { \
+void className##_##name::printName(Print* pPrinter) const { \
   pPrinter->print(F(#className "_" #name)); \
 } \
 int className##_##name :: runCoroutine()
@@ -130,10 +172,10 @@ int className##_##name :: runCoroutine()
 #define EXTERN_COROUTINE1(name) \
 struct Coroutine_##name : ace_routine::Coroutine { \
   Coroutine_##name(); \
-  void printName(Print* pPrinter) override; \
+  void printName(Print* pPrinter) const override; \
   int runCoroutine() override; \
 }; \
-void Coroutine_##name::printName(Print* pPrinter) { \
+void Coroutine_##name::printName(Print* pPrinter) const { \
   pPrinter->print(F("Coroutine_" #name)); \
 } \
 extern Coroutine_##name name
@@ -142,10 +184,10 @@ extern Coroutine_##name name
 #define EXTERN_COROUTINE2(className, name) \
 struct className##_##name : className { \
   className##_##name(); \
-  void printName(Print* pPrinter) override; \
+  void printName(Print* pPrinter) const override; \
   int runCoroutine() override; \
 }; \
-void Coroutine_##name :: printName(Print* pPrinter) { \
+void Coroutine_##name :: printName(Print* pPrinter) const { \
   pPrinter->print(F(#className "_" #name)); \
 } \
 extern className##_##name name
@@ -314,11 +356,11 @@ class CoroutineTemplate {
     /**
      * Print the name of the Coroutine.
      */
-    virtual void printName(Print* pPrinter) { pPrinter->print('?'); }
+    virtual void printName(Print* pPrinter) const { pPrinter->print('?'); }
     /**
      * Print extra information about Coroutine.
      */
-    virtual void printExtra(Print* pPrinter) { pPrinter->print('-'); }
+    virtual void printExtra(Print* pPrinter) const { }
     /**
      * The body of the coroutine. The COROUTINE macro creates a subclass of
      * this class and puts the body of the coroutine into this method.
@@ -359,7 +401,7 @@ class CoroutineTemplate {
      */
     void suspend() {
       if (isDone()) return;
-      mStatus = kStatusSuspended;
+      setNewStatus(kStatusSuspended);
     }
 
     /**
@@ -376,7 +418,7 @@ class CoroutineTemplate {
       // when Coroutine::runCoroutine() is called because COROUTINE_YIELD(),
       // COROUTINE_DELAY() and COROUTINE_AWAIT() are written to restore their
       // status.
-      mStatus = kStatusYielding;
+      setNewStatus(kStatusYielding);
     }
 
     /**
@@ -393,7 +435,7 @@ class CoroutineTemplate {
      * Coroutine upon the next iteration.
      */
     void reset() {
-      mStatus = kStatusYielding;
+      setNewStatus(kStatusYielding);
       mJumpPoint = nullptr;
     }
 
@@ -471,7 +513,6 @@ class CoroutineTemplate {
     void setupCoroutine(const __FlashStringHelper* /*name*/)
         ACE_ROUTINE_DEPRECATED {}
 
-  protected:
     /**
      * The execution status of the coroutine, corresponding to the
      * COROUTINE_YIELD(), COROUTINE_DELAY(), COROUTINE_AWAIT() and
@@ -502,35 +543,19 @@ class CoroutineTemplate {
      *         Terminated
      * @endverbatim
      */
-#if 0
-    typedef uint8_t Status;
-#else
+#ifdef ACE_USE_MULTI_CHAR_STATUS
     typedef uint32_t Status;
+#else
+    typedef uint8_t Status;
 #endif
+  protected:
     /**
      * Coroutine has been suspended using suspend() and the scheduler should
      * remove it from the queue upon the next iteration. We don't distinguish
      * whether the coroutine is still in the queue or not with this status. We
      * can add that later if we need to.
      */
-#if 0
-    static const Status kStatusSuspended = 0;
-
-    /** Coroutine returned using the COROUTINE_YIELD() statement. */
-    static const Status kStatusYielding = 1;
-
-    /** Coroutine returned using the COROUTINE_DELAY() statement. */
-    static const Status kStatusDelaying = 2;
-
-    /** Coroutine is currenly running. True only within the coroutine itself. */
-    static const Status kStatusRunning = 3;
-
-    /** Coroutine executed the COROUTINE_END() statement. */
-    static const Status kStatusEnding = 4;
-
-    /** Coroutine has ended and no longer in the scheduler queue. */
-    static const Status kStatusTerminated = 5;
-#elif 0
+#if defined(ACE_USE_SINGLE_CHAR_STATUS)
     static const Status kStatusSuspended = 'S'; // was 0;
 
     /** Coroutine returned using the COROUTINE_YIELD() statement. */
@@ -547,7 +572,7 @@ class CoroutineTemplate {
 
     /** Coroutine has ended and no longer in the scheduler queue. */
     static const Status kStatusTerminated = 'T'; // was 5;
-#else
+#elif defined(ACE_USE_MULTI_CHAR_STATUS)
     static const Status kStatusSuspended = 'S' + 'u'*0x100 + 's'*0x10000; // was 0;
 
     /** Coroutine returned using the COROUTINE_YIELD() statement. */
@@ -564,6 +589,23 @@ class CoroutineTemplate {
 
     /** Coroutine has ended and no longer in the scheduler queue. */
     static const Status kStatusTerminated = 'T' + 'r'*0x100 + 'm'*0x10000; // was 5;
+#else
+    static const Status kStatusSuspended = 0;
+
+    /** Coroutine returned using the COROUTINE_YIELD() statement. */
+    static const Status kStatusYielding = 1;
+
+    /** Coroutine returned using the COROUTINE_DELAY() statement. */
+    static const Status kStatusDelaying = 2;
+
+    /** Coroutine is currenly running. True only within the coroutine itself. */
+    static const Status kStatusRunning = 3;
+
+    /** Coroutine executed the COROUTINE_END() statement. */
+    static const Status kStatusEnding = 4;
+
+    /** Coroutine has ended and no longer in the scheduler queue. */
+    static const Status kStatusTerminated = 5;
 #endif
     /** Constructor. Automatically insert self into singly-linked list. */
     CoroutineTemplate() {
@@ -589,19 +631,21 @@ public:
     Status getStatus() const { return mStatus; }
 
     /** Print the human-readable string of the Status. */
-    void statusPrintTo(Print& printer) {
+    void statusPrintTo(Print& printer) const {
       statusPrintTo(printer, mStatus);
     }
-    /** Print the human-readable string of the Status. */
+    /** Print the human-readable string of any Status. */
     static void statusPrintTo(Print& printer, Status status) {
-#if 0
-      printer.print(sStatusStrings[status]);
-#elif 0
+#if defined(ACE_USE_FLASH_STRING_ARRAY_STATUS)
       printer.print((__FlashStringHelper*)pgm_read_word(&sStatusStrings[status]));
-#elif 0
+#elif defined(ACE_USE_FLASH_STRING_STATUS)
+      printer.print(sStatusStrings[status]);
+#elif defined(ACE_USE_SINGLE_CHAR_STATUS)
       printer.print((char)status);
-#else
+#elif defined(ACE_USE_MULTI_CHAR_STATUS)
       printer.print((const char*)&status);
+#else
+ #error "Unknown or missing Status printing method"
 #endif
     }
   protected:
@@ -618,28 +662,52 @@ public:
      */
     void* getJump() const { return mJumpPoint; }
 
-    /** Set the kStatusRunning state. */
-    void setRunning() {
-      if(msChangeStatusCB != nullptr){
-        msChangeStatusCB(this, kStatusRunning);
-      }
-      mStatus = kStatusRunning;
+    /** Keep track of how long it was hogging runtime without yield, delay, etc. */
+    void checkRunningTime(){
+#if ACE_RUN_TICKS == 6
+      auto now = micros();
+#else
+      auto now = millis(); // make millis default if not 6/micros
+#endif
+      ++mRunsCompleted;
+      // track previous & maximum run time
+      mTicksPrevRunning = now - mTicksWhenRunStarted;
+      if(mTicksMaxRunning < mTicksPrevRunning) { mTicksMaxRunning = mTicksPrevRunning; }
     }
 
-    /** Set the kStatusDelaying state. */
-    void setYielding() { mStatus = kStatusYielding; }
+    /** Update Status, notify via callback if there is a listener, and keep track of Running time. */
+    void setNewStatus(Status newStatus){
+      if(mStatus == kStatusRunning){ checkRunningTime(); }
+      if(msChangeStatusCB != nullptr){
+        msChangeStatusCB(this, newStatus);
+      }
+      if(newStatus == kStatusRunning) {
+#if ACE_RUN_TICKS == 6
+        mTicksWhenRunStarted = micros();
+#else
+        mTicksWhenRunStarted = millis(); // make millis default if not 6/micros
+#endif
+      }
+      mStatus = newStatus;
+    }
+
+    /** Set the kStatusRunning state. */
+    void setRunning() { setNewStatus(kStatusRunning); }
 
     /** Set the kStatusDelaying state. */
-    void setDelaying() { mStatus = kStatusDelaying; }
+    void setYielding() { setNewStatus(kStatusYielding); }
+
+    /** Set the kStatusDelaying state. */
+    void setDelaying() { setNewStatus(kStatusDelaying); }
 
     /** Set the kStatusEnding state. */
-    void setEnding() { mStatus = kStatusEnding; }
+    void setEnding() { setNewStatus(kStatusEnding); }
 
     /**
      * Set status to indicate that the Coroutine has been removed from the
      * Scheduler queue. Should be used only by the CoroutineScheduler.
      */
-    void setTerminated() { mStatus = kStatusTerminated; }
+    void setTerminated() { setNewStatus(kStatusTerminated); }
 
     /**
      * Configure the delay timer for delayMillis.
@@ -770,8 +838,17 @@ static fpChangeStatusCB msChangeStatusCB;
     /** Address of the label used by the computed-goto. */
     void* mJumpPoint = nullptr;
 
-    /** Line Number of last milestone. */
+    /** Line Number of last milestone e.g. status change. */
     uint16_t mLineNumber = 0;
+
+    /** Set time when Running starts. */
+    uint16_t mTicksWhenRunStarted = 0;
+    /** Previous running time. */
+    uint16_t mTicksPrevRunning = 0;
+    /** Longest running time. */
+    uint16_t mTicksMaxRunning = 0;
+    /** Number of runs; easily wraps around. */
+    uint16_t mRunsCompleted = 0;
 
     /** Run-state of the coroutine. */
     Status mStatus = kStatusYielding;
@@ -790,14 +867,17 @@ static fpChangeStatusCB msChangeStatusCB;
      */
     uint16_t mDelayDuration;
   public:
-    /**
-     * Return the Line Number of last milestone.
-     */
+    /** Return the Line Number of last milestone. */
     uint16_t getLineNumber() const { return mLineNumber; }
 
-    /**
-     * Set status change callback.
-     */
+    /** Return the previous completed Running time. */
+    uint16_t getPrevRunningTime_Ticks() const { return mTicksPrevRunning; }
+    /** Return the longest Running time. */
+    uint16_t getMaxRunningTime_Ticks() const { return mTicksMaxRunning; }
+    /** Return number of Runs (can easily wrap). */
+    uint16_t getRunsCompleted() const { return mRunsCompleted; }
+
+    /** Set status change callback. */
     static void setStatusChangeCB(fpChangeStatusCB changeStatusCB) {
       msChangeStatusCB = changeStatusCB;
     }

@@ -33,27 +33,34 @@ namespace ace_routine {
 // CoroutineScheduler::list() but I think it's worth it to make debugging
 // easier.
 
-#if 0
-static const char kStatusSuspendedString[] PROGMEM = "Suspended";
-static const char kStatusYieldingString[] PROGMEM = "Yielding";
-static const char kStatusDelayingString[] PROGMEM = "Delaying";
-static const char kStatusRunningString[] PROGMEM = "Running";
-static const char kStatusEndingString[] PROGMEM = "Ending";
-static const char kStatusTerminatedString[] PROGMEM = "Terminated";
-#if 0
-const __FlashStringHelper* const sStatusStrings[] = {
-#else
-const __FlashStringHelper* const sStatusStrings[] PROGMEM = {
-#endif
-  FPSTR(kStatusSuspendedString),
-  FPSTR(kStatusYieldingString),
-  FPSTR(kStatusDelayingString),
-  FPSTR(kStatusRunningString),
-  FPSTR(kStatusEndingString),
-  FPSTR(kStatusTerminatedString),
-};
-
+#ifdef ACE_USE_FLASH_STRING_STATUS
+ #ifdef ACE_USE_FLASH_SHORT_STRING_STATUS
+  static const char kStatusSuspendedString[] PROGMEM = "Sus'd";
+  static const char kStatusYieldingString[] PROGMEM = "Yld'g";
+  static const char kStatusDelayingString[] PROGMEM = "Dly'g";
+  static const char kStatusRunningString[] PROGMEM = "Run'g";
+  static const char kStatusEndingString[] PROGMEM = "End'g";
+  static const char kStatusTerminatedString[] PROGMEM = "Trm'd";
+ #else
+  static const char kStatusSuspendedString[] PROGMEM = "Suspended";
+  static const char kStatusYieldingString[] PROGMEM = "Yielding";
+  static const char kStatusDelayingString[] PROGMEM = "Delaying";
+  static const char kStatusRunningString[] PROGMEM = "Running";
+  static const char kStatusEndingString[] PROGMEM = "Ending";
+  static const char kStatusTerminatedString[] PROGMEM = "Terminated";
+ #endif
+ #ifdef ACE_USE_FLASH_STRING_ARRAY_STATUS
+  const __FlashStringHelper* const sStatusStrings[] PROGMEM = {
+ #else
+  const __FlashStringHelper* const sStatusStrings[] = {
+ #endif
+   FPSTR(kStatusSuspendedString),
+   FPSTR(kStatusYieldingString),
+   FPSTR(kStatusDelayingString),
+   FPSTR(kStatusRunningString),
+   FPSTR(kStatusEndingString),
+   FPSTR(kStatusTerminatedString),
+  };
 #endif
 template<> CoroutineTemplate<ClockInterface>::fpChangeStatusCB CoroutineTemplate<ClockInterface>::msChangeStatusCB = nullptr;
-
 }

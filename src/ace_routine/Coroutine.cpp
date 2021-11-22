@@ -35,12 +35,12 @@ namespace ace_routine {
 
 #ifdef ACE_USE_FLASH_STRING_STATUS
  #ifdef ACE_USE_FLASH_SHORT_STRING_STATUS
-  static const char kStatusSuspendedString[] PROGMEM = "Sus'd";
-  static const char kStatusYieldingString[] PROGMEM = "Yld'g";
-  static const char kStatusDelayingString[] PROGMEM = "Dly'g";
-  static const char kStatusRunningString[] PROGMEM = "Run'g";
-  static const char kStatusEndingString[] PROGMEM = "End'g";
-  static const char kStatusTerminatedString[] PROGMEM = "Trm'd";
+  static const char kStatusSuspendedString[] PROGMEM = "Sspd";
+  static const char kStatusYieldingString[] PROGMEM = "Yldg";
+  static const char kStatusDelayingString[] PROGMEM = "Dlyg";
+  static const char kStatusRunningString[] PROGMEM = "Rnng";
+  static const char kStatusEndingString[] PROGMEM = "Endg";
+  static const char kStatusTerminatedString[] PROGMEM = "Trmntd";
  #else
   static const char kStatusSuspendedString[] PROGMEM = "Suspended";
   static const char kStatusYieldingString[] PROGMEM = "Yielding";

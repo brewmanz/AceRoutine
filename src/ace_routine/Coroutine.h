@@ -43,7 +43,7 @@ SOFTWARE.
  #endif
  #pragma message("BTW ACE_RUN_TICKS now set to " NUM2STR(ACE_RUN_TICKS) " (3=millis, 6=micros)")
 #else
- #pragma message("BTW ACE_RUN_TICKS already set " NUM2STR(ACE_RUN_TICKS) " (3=millis, 6=micros)")
+ #pragma message("BTW ACE_RUN_TICKS already set to " NUM2STR(ACE_RUN_TICKS) " (3=millis, 6=micros)")
 #endif
 
 #if 0 // always 0

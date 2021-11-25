@@ -148,6 +148,7 @@ className##_##name :: className##_##name() { \
 } \
 void className##_##name::printName(Print* pPrinter) const { \
   pPrinter->print(F(#className "_" #name)); \
+  className::printName(pPrinter); \
 } \
 int className##_##name :: runCoroutine()
 
@@ -353,14 +354,17 @@ class CoroutineTemplate {
   friend class ::SuspendTest_suspendAndResume;
 
   public:
-    /**
-     * Print the name of the Coroutine.
-     */
-    virtual void printName(Print* pPrinter) const { pPrinter->print('?'); }
-    /**
-     * Print extra information about Coroutine.
-     */
-    virtual void printExtra(Print* pPrinter) const { }
+    /** Print the name of the Coroutine. */
+    virtual void printName(Print* pPrinter) const {};
+
+    /** Print name and milestone line number */
+    void printNameWithLine(Print* pPrinter) const {
+      printName(pPrinter); pPrinter->print('(');  pPrinter->print(mLineNumber, DEC);  pPrinter->print(')');
+    }
+
+    /** Print extra information about Coroutine. */
+    virtual void printExtra(Print* pPrinter) const {}
+
     /**
      * The body of the coroutine. The COROUTINE macro creates a subclass of
      * this class and puts the body of the coroutine into this method.

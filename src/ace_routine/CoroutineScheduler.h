@@ -196,18 +196,8 @@ class CoroutineSchedulerTemplate {
           p = (*p)->getNext()) {
         printer.print(F("Coroutine "));
         printer.print((uintptr_t) *p);
-        printer.print(':');
-        (*p)->printNameWithLine(&printer);
-        printer.print(F(" status: "));
+        printer.print(F("; status: "));
         (*p)->statusPrintTo(printer);
-        printer.print(F("; prev/max/# Run="));
-        printer.print((*p)->getPrevRunningTime_Ticks(), DEC);
-        printer.print('/');
-        printer.print((*p)->getMaxRunningTime_Ticks(), DEC);
-        printer.print('/');
-        printer.print((*p)->getRunsCompleted(), DEC);
-        printer.print(F("; extra: "));
-        (*p)->printExtra(&printer);
         printer.println();
       }
     }

@@ -343,6 +343,29 @@ extern const __FlashStringHelper* const sStatusStrings[];
 // Forward declaration of CoroutineSchedulerTemplate<T>
 template <typename T> class CoroutineSchedulerTemplate;
 
+class ICoroutineVisitor;
+template <typename T_CLOCK> class CoroutineTemplate;
+
+/**
+ * A way for some future object to be called for each instance of Coroutine
+ * that's been set up, using the Visitor Pattern
+ * https://en.wikipedia.org/wiki/Visitor_pattern .
+ * Just implement the pure virtual methods in your class. Then
+ * @code
+ *    ICoroutineVisitor myCV = MyCoroutineVisitor(myVariousOptionParameters);
+ *    Coroutine.callVisitorForEachCoroutineInChain(myCV);
+ * @endcode
+ */
+class ICoroutineVisitor{
+public:
+  // called once, before visiting each Coroutine
+  virtual void PreVisits() = 0;
+  // called for each Coroutine in turn
+  virtual void Visit(CoroutineTemplate<ClockInterface>* pVisitee) = 0;
+  // called once, after visiting each Coroutine
+  virtual void PostVisits() = 0;
+};
+
 /**
  * Base class of all coroutines. The actual coroutine code is an implementation
  * of the virtual runCoroutine() method.
@@ -884,6 +907,15 @@ static fpChangeStatusCB msChangeStatusCB;
     /** Set status change callback. */
     static void setStatusChangeCB(fpChangeStatusCB changeStatusCB) {
       msChangeStatusCB = changeStatusCB;
+    }
+
+    /** Call a visitor for each instance of CoroutineTemplate in the chain. */
+    static void callVisitorForEachCoroutineInChain(ICoroutineVisitor* pVisitor){
+      pVisitor->PreVisits();
+      for(CoroutineTemplate** ppVisitee = getRoot(); (*ppVisitee) != nullptr; ppVisitee = (*ppVisitee)->getNext()){
+        pVisitor->Visit(*ppVisitee);
+      }
+      pVisitor->PostVisits();
     }
 };
 

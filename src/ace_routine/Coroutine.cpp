@@ -41,6 +41,8 @@ namespace ace_routine {
   static const char kStatusRunningString[] PROGMEM = "Rnng";
   static const char kStatusEndingString[] PROGMEM = "Endg";
   static const char kStatusTerminatedString[] PROGMEM = "Trmntd";
+  static const char kStatusColdString[] PROGMEM = "Cold";
+  static const char kStatusAwaitingString[] PROGMEM = "Awtg";
  #else
   static const char kStatusSuspendedString[] PROGMEM = "Suspended";
   static const char kStatusYieldingString[] PROGMEM = "Yielding";
@@ -48,6 +50,8 @@ namespace ace_routine {
   static const char kStatusRunningString[] PROGMEM = "Running";
   static const char kStatusEndingString[] PROGMEM = "Ending";
   static const char kStatusTerminatedString[] PROGMEM = "Terminated";
+  static const char kStatusColdString[] PROGMEM = "Cold";
+  static const char kStatusAwaitingString[] PROGMEM = "Awaiting";
  #endif
  #ifdef ACE_USE_FLASH_STRING_ARRAY_STATUS
   const __FlashStringHelper* const sStatusStrings[] PROGMEM = {
@@ -60,6 +64,8 @@ namespace ace_routine {
    FPSTR(kStatusRunningString),
    FPSTR(kStatusEndingString),
    FPSTR(kStatusTerminatedString),
+   FPSTR(kStatusColdString),
+   FPSTR(kStatusAwaitingString),
   };
 #endif
 template<> CoroutineTemplate<ClockInterface>::fpChangeStatusCB CoroutineTemplate<ClockInterface>::msChangeStatusCB = nullptr;

@@ -246,7 +246,7 @@ extern className##_##name name
 #define COROUTINE_AWAIT_LINE(condition, line) \
     do { \
       mLineNumber = line; \
-      this->setYielding(); \
+      this->setAwaiting(F(NUM2STR(condition))); \
       do { \
         COROUTINE_YIELD_INTERNAL(); \
       } while (!(condition)); \
@@ -273,7 +273,7 @@ extern className##_##name name
     do { \
       mLineNumber = line; \
       this->setDelayMillis(delayMillis); \
-      this->setDelaying(); \
+      this->setDelaying(F(NUM2STR(delayMillis) " mS")); \
       do { \
         COROUTINE_YIELD_INTERNAL(); \
       } while (!this->isDelayExpired()); \
@@ -286,7 +286,7 @@ extern className##_##name name
     do { \
       mLineNumber = line; \
       this->setDelayMicros(delayMicros); \
-      this->setDelaying(); \
+      this->setDelaying(F(NUM2STR(delayMicros) " uS")); \
       do { \
         COROUTINE_YIELD_INTERNAL(); \
       } while (!this->isDelayMicrosExpired()); \
@@ -313,7 +313,7 @@ extern className##_##name name
     do { \
       mLineNumber = line; \
       this->setDelaySeconds(delaySeconds); \
-      this->setDelaying(); \
+      this->setDelaying(F(NUM2STR(delaySeconds) " S")); \
       do { \
         COROUTINE_YIELD_INTERNAL(); \
       } while (!this->isDelaySecondsExpired()); \
@@ -358,11 +358,11 @@ template <typename T_CLOCK> class CoroutineTemplate;
  */
 class ICoroutineVisitor{
 public:
-  // called once, before visiting each Coroutine
+  // called once, before visiting any Coroutine
   virtual void PreVisits() = 0;
   // called for each Coroutine in turn
   virtual void Visit(CoroutineTemplate<ClockInterface>* pVisitee) = 0;
-  // called once, after visiting each Coroutine
+  // called once, after visiting all of the Coroutines
   virtual void PostVisits() = 0;
 };
 
@@ -491,7 +491,19 @@ class CoroutineTemplate {
     bool isSuspended() const { return mStatus == kStatusSuspended; }
 
     /** The coroutine returned using COROUTINE_YIELD(). */
-    bool isYielding() const { return mStatus == kStatusYielding; }
+#if defined(ACE_IGNORE_YIELDING_BACKWARDS_COMPATIBILITY)
+ #pragma message("BTW ACE_IGNORE_YIELDING_BACKWARDS_COMPATIBILITY is defined")
+    bool isYielding() const { return (mStatus == kStatusYielding); }
+#else
+ #pragma message("NB isYielding() also true for Awaiting, for backwards compatibility, Otherwise try ACE_IGNORE_YIELDING_BACKWARDS_COMPATIBILITY")
+    bool isYielding() const { return (mStatus == kStatusYielding) || (mStatus == kStatusAwaiting) || (mStatus == kStatusCold); }
+#endif
+
+    /** The coroutine returned using if runCoroutine() never called. */
+    bool isCold() const { return mStatus == kStatusCold; }
+
+    /** The coroutine returned using COROUTINE_YIELD(). */
+    bool isAwaiting() const { return mStatus == kStatusAwaiting; }
 
     /** The coroutine returned using COROUTINE_DELAY(). */
     bool isDelaying() const { return mStatus == kStatusDelaying; }
@@ -548,17 +560,17 @@ class CoroutineTemplate {
      * The finite state diagram looks like this:
      *
      * @verbatim
-     *          Suspended
-     *          ^       ^
-     *         /         \
-     *        /           \
-     *       v             \
-     * Yielding          Delaying
-     *      ^               ^
-     *       \             /
-     *        \           /
-     *         \         /
-     *          v       v
+     * Cold     Suspended
+     *   |      ^   ^   ^
+     *   |     /    |    \
+     *   |    /     |     \
+     *   v   v      v      \
+     * Yielding Awaiting Delaying
+     *      ^       ^       ^
+     *       \      |      /
+     *        \     |     /
+     *         \    |    /
+     *          v   v   v
      *           Running
      *              |
      *              |
@@ -575,7 +587,6 @@ class CoroutineTemplate {
 #else
     typedef uint8_t Status;
 #endif
-  protected:
     /**
      * Coroutine has been suspended using suspend() and the scheduler should
      * remove it from the queue upon the next iteration. We don't distinguish
@@ -587,6 +598,12 @@ class CoroutineTemplate {
 
     /** Coroutine returned using the COROUTINE_YIELD() statement. */
     static const Status kStatusYielding = 'Y'; // was 1;
+
+    /** Coroutine returned if runCoroutine() never called. */
+    static const Status kStatusCold = 'C'; // was 6;
+
+    /** Coroutine returned using the COROUTINE_AWAIT() statement. */
+    static const Status kStatusAwaiting = 'A'; // was 7;
 
     /** Coroutine returned using the COROUTINE_DELAY() statement. */
     static const Status kStatusDelaying = 'D'; // was 2;
@@ -605,6 +622,12 @@ class CoroutineTemplate {
     /** Coroutine returned using the COROUTINE_YIELD() statement. */
     static const Status kStatusYielding = 'Y' + 'l'*0x100 + 'd'*0x10000; // was 1;
 
+    /** Coroutine returned if runCoroutine() never called. */
+    static const Status kStatusYielding = 'C' + 'l'*0x100 + 'd'*0x10000; // was 6;
+
+    /** Coroutine returned using the COROUTINE_AWAIT() statement. */
+    static const Status kStatusYielding = 'A' + 'w'*0x100 + 't'*0x10000; // was 7;
+
     /** Coroutine returned using the COROUTINE_DELAY() statement. */
     static const Status kStatusDelaying = 'D' + 'l'*0x100 + 'y'*0x10000; // was 2;
 
@@ -622,6 +645,12 @@ class CoroutineTemplate {
     /** Coroutine returned using the COROUTINE_YIELD() statement. */
     static const Status kStatusYielding = 1;
 
+    /** Coroutine returned if runCoroutine() never called. */
+    static const Status kStatusCold = 6;
+
+    /** Coroutine returned using the COROUTINE_AWAIT() statement. */
+    static const Status kStatusAwaiting = 7;
+
     /** Coroutine returned using the COROUTINE_DELAY() statement. */
     static const Status kStatusDelaying = 2;
 
@@ -634,9 +663,11 @@ class CoroutineTemplate {
     /** Coroutine has ended and no longer in the scheduler queue. */
     static const Status kStatusTerminated = 5;
 #endif
+  protected:
     /** Constructor. Automatically insert self into singly-linked list. */
     CoroutineTemplate() {
       insertAtRoot();
+      mCondition = F("");
     }
 
     /**
@@ -718,14 +749,21 @@ public:
       mStatus = newStatus;
     }
 
+    // TODO Maybe set mCondition to empty if not Awating/Delaying?
     /** Set the kStatusRunning state. */
     void setRunning() { setNewStatus(kStatusRunning); }
 
     /** Set the kStatusDelaying state. */
     void setYielding() { setNewStatus(kStatusYielding); }
 
+    /** Set the kStatusCold state. */
+    void setCold() { setNewStatus(kStatusCold); }
+
+    /** Set the kStatusAwaiting state. */
+    void setAwaiting(const __FlashStringHelper* condition) { mCondition = condition; setNewStatus(kStatusAwaiting); }
+
     /** Set the kStatusDelaying state. */
-    void setDelaying() { setNewStatus(kStatusDelaying); }
+    void setDelaying(const __FlashStringHelper* condition) { mCondition = condition; setNewStatus(kStatusDelaying); }
 
     /** Set the kStatusEnding state. */
     void setEnding() { setNewStatus(kStatusEnding); }
@@ -868,6 +906,9 @@ static fpChangeStatusCB msChangeStatusCB;
     /** Line Number of last milestone e.g. status change. */
     uint16_t mLineNumber = 0;
 
+    /** Text of code used for last Await or Delay. */
+    const __FlashStringHelper* mCondition;
+
     /** Set time when Running starts. */
     uint16_t mTicksWhenRunStarted = 0;
     /** Previous running time. */
@@ -878,7 +919,7 @@ static fpChangeStatusCB msChangeStatusCB;
     uint16_t mRunsCompleted = 0;
 
     /** Run-state of the coroutine. */
-    Status mStatus = kStatusYielding;
+    Status mStatus = kStatusCold;
 
     /**
      * Start time provided by COROUTINE_DELAY(), COROUTINE_DELAY_MICROS(), or
@@ -896,6 +937,9 @@ static fpChangeStatusCB msChangeStatusCB;
   public:
     /** Return the Line Number of last milestone. */
     uint16_t getLineNumber() const { return mLineNumber; }
+
+    /** Return the last Await or DelayXXX condition. */
+    const __FlashStringHelper* getCondition() const { return mCondition; }
 
     /** Return the previous completed Running time. */
     uint16_t getPrevRunningTime_Ticks() const { return mTicksPrevRunning; }

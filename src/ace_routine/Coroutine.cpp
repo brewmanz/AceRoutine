@@ -68,5 +68,7 @@ namespace ace_routine {
    FPSTR(kStatusAwaitingString),
   };
 #endif
+  template<> const Coroutine::Status CoroutineTemplate<ClockInterface>::kStatusAll[] = { Coroutine::kStatusCold, kStatusYielding, kStatusRunning, kStatusDelaying, kStatusAwaiting, kStatusSuspended, kStatusEnding, kStatusTerminated };
+
 template<> CoroutineTemplate<ClockInterface>::fpChangeStatusCB CoroutineTemplate<ClockInterface>::msChangeStatusCB = nullptr;
 }

@@ -246,6 +246,7 @@ extern className##_##name name
 #define COROUTINE_AWAIT_LINE(condition, line) \
     do { \
       mLineNumber = line; \
+      mDelayDuration = 0; \
       this->setAwaiting(F(NUM2STR(condition))); \
       do { \
         COROUTINE_YIELD_INTERNAL(); \
@@ -499,10 +500,10 @@ class CoroutineTemplate {
     bool isYielding() const { return (mStatus == kStatusYielding) || (mStatus == kStatusAwaiting) || (mStatus == kStatusCold); }
 #endif
 
-    /** The coroutine returned using if runCoroutine() never called. */
+    /** The coroutine runCoroutine() never been called. */
     bool isCold() const { return mStatus == kStatusCold; }
 
-    /** The coroutine returned using COROUTINE_YIELD(). */
+    /** The coroutine returned using COROUTINE_AWAIT(). */
     bool isAwaiting() const { return mStatus == kStatusAwaiting; }
 
     /** The coroutine returned using COROUTINE_DELAY(). */
@@ -623,10 +624,10 @@ class CoroutineTemplate {
     static const Status kStatusYielding = 'Y' + 'l'*0x100 + 'd'*0x10000; // was 1;
 
     /** Coroutine returned if runCoroutine() never called. */
-    static const Status kStatusYielding = 'C' + 'l'*0x100 + 'd'*0x10000; // was 6;
+    static const Status kStatusCold = 'C' + 'l'*0x100 + 'd'*0x10000; // was 6;
 
     /** Coroutine returned using the COROUTINE_AWAIT() statement. */
-    static const Status kStatusYielding = 'A' + 'w'*0x100 + 't'*0x10000; // was 7;
+    static const Status kStatusAwaiting = 'A' + 'w'*0x100 + 't'*0x10000; // was 7;
 
     /** Coroutine returned using the COROUTINE_DELAY() statement. */
     static const Status kStatusDelaying = 'D' + 'l'*0x100 + 'y'*0x10000; // was 2;
@@ -663,6 +664,7 @@ class CoroutineTemplate {
     /** Coroutine has ended and no longer in the scheduler queue. */
     static const Status kStatusTerminated = 5;
 #endif
+    static const Status kStatusAll[8]; // = { kStatusCold, kStatusYielding, kStatusRunning, kStatusDelaying, kStatusAwaiting, kStatusSuspended, kStatusEnding, kStatusTerminated };
   protected:
     /** Constructor. Automatically insert self into singly-linked list. */
     CoroutineTemplate() {
@@ -706,6 +708,11 @@ public:
  #error "Unknown or missing Status printing method"
 #endif
     }
+
+    /** Save some handwaved tag value that can be associated with each object. */
+    void setTag(void* pTag) { mpTag = pTag; }
+    /** Get some handwaved tag value that can be associated with each object. */
+    void* getTag() const { return mpTag; }
   protected:
 
     /**
@@ -736,15 +743,15 @@ public:
     /** Update Status, notify via callback if there is a listener, and keep track of Running time. */
     void setNewStatus(Status newStatus){
       if(mStatus == kStatusRunning){ checkRunningTime(); }
-      if(msChangeStatusCB != nullptr){
-        msChangeStatusCB(this, newStatus);
-      }
       if(newStatus == kStatusRunning) {
 #if ACE_RUN_TICKS == 6
         mTicksWhenRunStarted = micros();
 #else
         mTicksWhenRunStarted = millis(); // make millis default if not 6/micros
 #endif
+      }
+      if(msChangeStatusCB != nullptr){
+        msChangeStatusCB(this, newStatus);
       }
       mStatus = newStatus;
     }
@@ -909,14 +916,17 @@ static fpChangeStatusCB msChangeStatusCB;
     /** Text of code used for last Await or Delay. */
     const __FlashStringHelper* mCondition;
 
+    /** Some handwaved value that someone might use. */
+    void* mpTag = nullptr;
+
     /** Set time when Running starts. */
     uint16_t mTicksWhenRunStarted = 0;
     /** Previous running time. */
     uint16_t mTicksPrevRunning = 0;
     /** Longest running time. */
     uint16_t mTicksMaxRunning = 0;
-    /** Number of runs; easily wraps around. */
-    uint16_t mRunsCompleted = 0;
+    /** Number of runs. */
+    long mRunsCompleted = 0;
 
     /** Run-state of the coroutine. */
     Status mStatus = kStatusCold;
@@ -938,15 +948,26 @@ static fpChangeStatusCB msChangeStatusCB;
     /** Return the Line Number of last milestone. */
     uint16_t getLineNumber() const { return mLineNumber; }
 
-    /** Return the last Await or DelayXXX condition. */
-    const __FlashStringHelper* getCondition() const { return mCondition; }
+    /** Return the last Await or DelayXXX condition. Also some timer info. */
+    const __FlashStringHelper* getCondition(uint16_t* pDelayStartMaybe, uint16_t* pDelayDurationMaybe, uint16_t* pTicksWhenRunStartedMaybe) const {
+      if(pDelayStartMaybe) {
+        *pDelayStartMaybe = mDelayStart;
+      }
+      if(pDelayDurationMaybe) {
+        *pDelayDurationMaybe = mDelayDuration;
+      }
+      if(pTicksWhenRunStartedMaybe) {
+        *pTicksWhenRunStartedMaybe = mTicksWhenRunStarted;
+      }
+      return mCondition;
+    }
 
     /** Return the previous completed Running time. */
     uint16_t getPrevRunningTime_Ticks() const { return mTicksPrevRunning; }
     /** Return the longest Running time. */
     uint16_t getMaxRunningTime_Ticks() const { return mTicksMaxRunning; }
     /** Return number of Runs (can easily wrap). */
-    uint16_t getRunsCompleted() const { return mRunsCompleted; }
+    long getRunsCompleted() const { return mRunsCompleted; }
 
     /** Set status change callback. */
     static void setStatusChangeCB(fpChangeStatusCB changeStatusCB) {
